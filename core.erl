@@ -5,7 +5,8 @@
          join/1,
          lift/1,
          lift2/1,
-         pure/1
+         pure/1,
+         then/1
         ]).
 
 -include("earsec.hrl").
@@ -14,10 +15,10 @@
 -spec lift(fun((term()) -> term())) -> fun((parser()) -> parser()).
 lift(F) ->
     fun(ParserA) ->
-        fun(Input) ->
-            case ParserA(Input) of
-                #state{success = ok, result = A} = State ->
-                    State#state{result = F(A)};
+        fun(State) ->
+            case ParserA(State) of
+                {{ok, _Position, _Remainder} = State, A} ->
+                    {State, F(A)};
                 Error ->
                     Error
             end
@@ -29,16 +30,17 @@ lift(F) ->
 lift2(F) ->
     fun(ParserA) ->
         fun(ParserB) ->
-            ParserBC = (lift(F))(ParserA),
+            ParserF  = pure(F),
+            ParserBC = (app(ParserF))(ParserA),
             (app(ParserBC))(ParserB)
         end
     end.
 
-% Lift a term into a trivial parser.
+% Lift a term into an trivial, accepting parser.
 -spec pure(term()) -> parser().
 pure(Term) ->
-    fun(Input) ->
-        #state{success = ok, result = Term, position = 0, remainder = Input}
+    fun(State) ->
+        {State, Term}
     end.
 
 % Apply a function parser over a parser.
@@ -56,21 +58,24 @@ app(ParserF) ->
 -spec bind(parser()) -> fun((fun((term()) -> parser())) -> parser()).
 bind(ParserA) ->
     fun(F) ->
-        fun(Input) ->
-            case ParserA(Input) of
-                #state{success = ok, result = A, position = Position1, remainder = Remainder} ->
-                    case (F(A))(Remainder) of
-                        #state{success = ok, position = Position2} = State ->
-                            State#state{position = Position1 + Position2};
-                        Error ->
-                            Error#state{position = Position1}
-                    end;
+        fun(State1) ->
+            case ParserA(State1) of
+                {{ok, _Position, _Remainder} = State2, A} ->
+                    (F(A))(State2);
                 Error ->
                     Error
             end
         end
     end.
 
+% Run one parser, then toss the result and run a second.
+-spec then(parser()) -> fun((parser()) -> parser()).
+then(ParserA) ->
+    fun(ParserB) ->
+        (bind(ParserA))(fun(_) -> ParserB end)
+    end.
+
+% Collapse a parser of parsers into a parser.
 -spec join(parser()) -> parser().
 join(ParserPA) ->
     (bind(ParserPA))(fun(ParserA) -> ParserA end).

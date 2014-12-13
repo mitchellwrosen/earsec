@@ -1,8 +1,4 @@
--record(state,
-        { success   :: ok | {error, atom()}, % Whether or not the parser has failed.
-          result    :: term(),
-          position  :: integer(),
-          remainder :: binary()
-        }).
-
--type parser() :: fun((binary()) -> #state{} | {error, atom()}).
+-type state()  :: {ok, integer(), binary()} | {error, string(), integer(), binary()}.
+-type parser() :: fun((state()) -> {state(), term()}).
+-type parse_func() :: fun((integer(), binary()) -> {ok, integer(), binary(), term()}
+                                                 | {error, string()}).

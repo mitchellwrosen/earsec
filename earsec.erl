@@ -1,22 +1,36 @@
 -module(earsec).
 
--export([parse/2]).
+-export([make_parser/1,
+         parse/2
+        ]).
 
 -include("earsec.hrl").
 
-% Run a parser over input, succeeding only if the parser succeeds, and there is no trailing input.
+% Run a parser over input.
 %
 % Returns: 
-%   {ok, Result} on success
-%   {error, {trailing_input, Position, Remainder}} on successful parse with trailing input
-%   {error, {parse_error, FailedParser, Position, Remainder} on failed parse
--spec parse(parser(), binary()) -> {ok, term()} | {error, term()}.
+%   {ok, Result, RemainingInput} on success.
+%   {error, Reason, Position, Remainder} on failed parse.
+-spec parse(parser(), binary()) -> {ok, term(), binary()} | {error, string(), integer(), binary()}.
 parse(Parser, Input) ->
-    case Parser(Input) of
-        #state{success = ok, result = Result, remainder = <<>>} ->
-            {ok, Result};
-        #state{success = ok, position = Position, remainder = Remainder} ->
-            {error, {trailing_input, Position, Remainder}};
-        #state{success = {error, FailedParser}, position = Position, remainder = Remainder} ->
-            {error, {parse_error, FailedParser, Position, Remainder}}
+    case Parser({ok, 0, Input}) of
+        {{ok, _Position, Remainder}, Result} ->
+            {ok, Result, Remainder};
+        {Error, _Result} ->
+            Error
+    end.
+
+% Hide some incidental details of parsers.
+-spec make_parser(parse_func()) -> parser().
+make_parser(F) ->
+    fun
+        ({ok, Position1, Remainder1}) ->
+            case F(Position1, Remainder1) of
+                {ok, Position2, Remainder2, Result} ->
+                    {{ok, Position2, Remainder2}, Result};
+                {error, Reason} ->
+                    {{error, Reason, Position1, Remainder1}, undefined}
+            end;
+        (Error) ->
+            Error
     end.
