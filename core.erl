@@ -1,7 +1,9 @@
 -module(core).
 
--export([app/1,
+-export([alt/1,
+         app/1,
          bind/1,
+         empty/0,
          join/1,
          lift/1,
          lift2/1,
@@ -54,6 +56,27 @@ app(ParserF) ->
         end)
     end.
 
+% Parser that always fails.
+-spec empty() -> parser().
+empty() ->
+    fun({_Success, Position, Remainder}) ->
+        {{{error, "empty"}, Position, Remainder}, undefined}
+    end.
+
+% Try one parser, and if it fails, try another.
+-spec alt(parser()) -> fun((parser()) -> parser()).
+alt(ParserA) ->
+    fun(ParserB) ->
+        fun(State) ->
+            case ParserA(State) of
+                {{ok, _Position, _Remainder}, _Result} = Result ->
+                    Result;
+                _ ->
+                    ParserB(State)
+            end
+        end
+    end.
+
 % Bind the result of one parser to a parser function.
 -spec bind(parser()) -> fun((fun((term()) -> parser())) -> parser()).
 bind(ParserA) ->
@@ -79,3 +102,4 @@ then(ParserA) ->
 -spec join(parser()) -> parser().
 join(ParserPA) ->
     (bind(ParserPA))(fun(ParserA) -> ParserA end).
+

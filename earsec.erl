@@ -28,8 +28,8 @@ make_parser(F) ->
             case F(Position1, Remainder1) of
                 {ok, Position2, Remainder2, Result} ->
                     {{ok, Position2, Remainder2}, Result};
-                {error, Reason} ->
-                    {{error, Reason, Position1, Remainder1}, undefined}
+                Error ->
+                    {Error, Position1, Remainder1}, undefined}
             end;
         (Error) ->
             Error
