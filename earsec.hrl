@@ -1,4 +1,3 @@
--type state()  :: {ok, integer(), binary()} | {{error, string()}, integer(), binary()}.
--type parser() :: fun((state()) -> {state(), term()}).
--type parse_func() :: fun((integer(), binary()) -> {ok, integer(), binary(), term()}
-                                                 | {error, string()}).
+-type parser() :: fun((binary()) -> {ok, {term(), integer(), binary()}}
+                                  | {error, {term(), integer(), binary()}}).
+

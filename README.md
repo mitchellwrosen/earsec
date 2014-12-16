@@ -2,7 +2,8 @@ If you are coming from an Erlang background you may be unaware of what a parser
 combinator library even *is*. We start with a core data type
 
 ```erlang
--type parser() :: fun((state()) -> {state(), term()})
+-type parser() :: fun((binary()) -> {ok, {term(), integer(), binary()}}
+                                  | {error, {term(), integer(), binary()}}
 ```
 
 and attempt to build large parsers from reusable building-block parsers.
@@ -31,7 +32,7 @@ original parser to the input that many times.
 ```erlang
 -spec kafka_array(parser()) -> parser().
 kafka_array(Parser) ->
-    earsec:bind(earsec:bytes(4), fun(N) ->
+    earsec:bind(earsec:uint32(), fun(N) ->
         earsec:count(N, Parser)
     end).
 ```
@@ -46,9 +47,9 @@ partition_info() ->
     earsec:lift3(fun(Partition, ErrorCode, Offset) ->
                      {Partition, ErrorCode, Offset}
                  end,
-                 earsec:bytes(4),
-                 earsec:bytes(2),
-                 earsec:bytes(8)).
+                 earsec:uint32(),
+                 earsec:uint16(),
+                 earsec:uint64()).
 ```
 
 Next, let's use these two parsers to write a parser for `[Parser ErrorCode Offset]`.
@@ -66,8 +67,8 @@ it's simply binary data preceded by 16 bits indicating its length.
 ```erlang
 -spec kafka_string() -> parser().
 kafka_string() ->
-    earsec:bind(earsec:bytes(2), fun(Len) ->
-        earsec:bytes(Len)
+    earsec:bind(earsec:uint16(), fun(Len) ->
+        earsec:binary(Len)
     end).
 ```
 
@@ -82,6 +83,14 @@ topic_info() ->
                  end,
                  kafka_string(),
                  partition_info_array()).
+```
+
+And finally, an array of them:
+
+```erlang
+-spec produce_response() -> parser().
+produce_response() ->
+    kafka_array(topic_info()).
 ```
 
 Neat-o!
