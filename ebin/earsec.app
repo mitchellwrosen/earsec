@@ -1,0 +1,7 @@
+{application,earsec,
+             [{description,"A simple parser combinary library"},
+              {vsn,"1"},
+              {modules,[earsec]},
+              {registered,[]},
+              {applications,[kernel,stdlib]},
+              {env,[]}]}.
