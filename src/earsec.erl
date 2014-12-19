@@ -14,6 +14,8 @@
          lift/2,
          lift2/3,
          lift3/4,
+         lift4/5,
+         lift5/6,
          many0/1,
          many1/1,
          option/2,
@@ -64,6 +66,14 @@ lift2(F, ParserA, ParserB) ->
 -spec lift3(fun((A, B, C) -> D), parser(A), parser(B), parser(C)) -> parser(D).
 lift3(F, ParserA, ParserB, ParserC) ->
     app(app(app(pure(uncurry2(F)), ParserA), ParserB), ParserC).
+
+-spec lift4(fun((A, B, C, D) -> E), parser(A), parser(B), parser(C), parser(D)) -> parser(E).
+lift4(F, ParserA, ParserB, ParserC, ParserD) ->
+    app(app(app(app(pure(uncurry3(F)), ParserA), ParserB), ParserC), ParserD).
+
+-spec lift5(fun((A, B, C, D, E) -> F), parser(A), parser(B), parser(C), parser(D), parser(E)) -> parser(F).
+lift5(F, ParserA, ParserB, ParserC, ParserD, ParserE) ->
+    app(app(app(app(app(pure(uncurry4(F)), ParserA), ParserB), ParserC), ParserD), ParserE).
 
 % Lift a term into an trivial, accepting parser.
 -spec pure(A) -> parser(A).
@@ -254,10 +264,10 @@ binary(Bytes) ->
 
 cons(X, Xs) -> [X|Xs].
 
--spec replicate(integer(), term()) -> [term()].
+-spec replicate(integer(), A) -> [A].
 replicate(N, Term) -> [Term || _ <- lists:seq(1, N)].
 
--spec uncurry(fun((term(), term()) -> term())) -> fun((term()) -> fun((term()) -> term())).
+-spec uncurry(fun((A, B) -> C)) -> fun((A) -> fun((B) -> C)).
 uncurry(F) ->
     fun(A) ->
         fun(B) ->
@@ -265,12 +275,38 @@ uncurry(F) ->
         end
     end.
 
--spec uncurry2(fun((term(), term(), term()) -> term())) -> fun((term()) -> fun((term()) -> fun((term()) -> term()))).
+-spec uncurry2(fun((A, B, C) -> D)) -> fun((A) -> fun((B) -> fun((C) -> D))).
 uncurry2(F) ->
     fun(A) ->
         fun(B) ->
             fun(C) ->
                 F(A, B, C)
+            end
+        end
+    end.
+
+-spec uncurry3(fun((A, B, C, D) -> E)) -> fun((A) -> fun((B) -> fun((C) -> fun((D) -> E)))).
+uncurry3(F) ->
+    fun(A) ->
+        fun(B) ->
+            fun(C) ->
+                fun(D) ->
+                    F(A, B, C, D)
+                end
+            end
+        end
+    end.
+
+-spec uncurry4(fun((A, B, C, D, E) -> F)) -> fun((A) -> fun((B) -> fun((C) -> fun((D) -> fun((E) -> F))))).
+uncurry4(F) ->
+    fun(A) ->
+        fun(B) ->
+            fun(C) ->
+                fun(D) ->
+                    fun(E) ->
+                        F(A, B, C, D, E)
+                    end
+                end
             end
         end
     end.
