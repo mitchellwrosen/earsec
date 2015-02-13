@@ -10,6 +10,10 @@
          empty/0,
          end_by0/2,
          end_by1/2,
+         int8/0,
+         int16/0,
+         int32/0,
+         int64/0,
          join/1,
          lift/2,
          lift2/3,
@@ -34,11 +38,11 @@
 
 -export_type([parser/1]).
 
--type parser(Term) :: fun((binary()) -> {ok, {Term, integer(), binary()}}
-                                      | {error, {Term, integer(), binary()}}).
+-type parser(A) :: fun((binary()) -> {ok, {A, integer(), binary()}}
+                                   | {error, {term(), integer(), binary()}}).
 
 % Run a parser over input.
--spec parse(parser(A :: term()), binary()) -> {ok, A} | {error, {A, integer(), binary()}}.
+-spec parse(parser(A :: term()), binary()) -> {ok, A} | {error, {term(), integer(), binary()}} when A :: term().
 parse(Parser, Input) ->
     case Parser(Input) of
         {ok, {Result, _, <<>>}} ->
@@ -95,7 +99,7 @@ app(ParserF, ParserA) ->
 -spec empty() -> parser(A) when A :: term().
 empty() ->
     fun(Input) ->
-        {error, {"empty", 0, Input}}
+        {error, {empty, 0, Input}}
     end.
 
 % Try one parser, and if it fails, try another.
@@ -230,23 +234,46 @@ endby_body(Parser, Sep) ->
 uint(Bytes, ErrReason) ->
     Bits = Bytes*8,
     fun
-        (<<N:Bits, Rest/binary>>) ->
+        (<<N:Bits/unsigned, Rest/binary>>) ->
+            {ok, {N, Bytes, Rest}};
+        (Rest) ->
+            {error, {ErrReason, 0, Rest}}
+    end.
+
+% Parse a signed, big-endian integer of the specified byte size.
+-spec int(integer(), string()) -> parser(integer()).
+int(Bytes, ErrReason) ->
+    Bits = Bytes*8,
+    fun
+        (<<N:Bits/signed, Rest/binary>>) ->
             {ok, {N, Bytes, Rest}};
         (Rest) ->
             {error, {ErrReason, 0, Rest}}
     end.
 
 -spec uint8() -> parser(non_neg_integer()).
-uint8() -> uint(1, "uint8").
+uint8() -> uint(1, uint8).
 
 -spec uint16() -> parser(non_neg_integer()).
-uint16() -> uint(2, "uint16").
+uint16() -> uint(2, uint16).
 
 -spec uint32() -> parser(non_neg_integer()).
-uint32() -> uint(4, "uint32").
+uint32() -> uint(4, uint32).
 
 -spec uint64() -> parser(non_neg_integer()).
-uint64() -> uint(8, "uint64").
+uint64() -> uint(8, uint64).
+
+-spec int8() -> parser(non_neg_integer()).
+int8() -> int(1, int8).
+
+-spec int16() -> parser(non_neg_integer()).
+int16() -> int(2, int16).
+
+-spec int32() -> parser(non_neg_integer()).
+int32() -> int(4, int32).
+
+-spec int64() -> parser(non_neg_integer()).
+int64() -> int(8, int64).
 
 % Parse a binary of the specified length.
 -spec binary(non_neg_integer()) -> parser(binary()).
@@ -255,7 +282,7 @@ binary(Bytes) ->
         (<<Binary:Bytes/binary, Rest/binary>>) ->
             {ok, {Binary, Bytes, Rest}};
         (Rest) ->
-            {error, {"binary", 0, Rest}}
+            {error, {binary, 0, Rest}}
     end.
 
 % -----------------------------------------------------------------------------
