@@ -153,8 +153,10 @@ many0(Parser) ->
 many1(Parser) ->
     lift2(fun cons/2, Parser, many0(Parser)).
 
-% Sequence a (non-empty) list of parsers.
+% Sequence a list of parsers.
 -spec sequence([parser(A)]) -> parser([A]).
+sequence([]) ->
+    pure([]);
 sequence([P]) ->
     lift(fun(R) -> [R] end, P);
 sequence([P|Ps]) ->
