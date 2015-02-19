@@ -38,19 +38,16 @@
 
 -export_type([parser/1]).
 
--type parser(A) :: fun((binary()) -> {ok, {A, integer(), binary()}}
-                                   | {error, {term(), integer(), binary()}}).
+-type parser(A) :: fun((binary()) -> {A, integer(), binary()}).
 
 % Run a parser over input.
--spec parse(parser(A :: term()), binary()) -> {ok, A} | {error, {term(), integer(), binary()}} when A :: term().
+-spec parse(parser(A :: term()), binary()) -> A when A :: term().
 parse(Parser, Input) ->
-    case Parser(Input) of
-        {ok, {Result, _, <<>>}} ->
-            {ok, Result};
-        {ok, {_, Position, Remainder}} ->
-            {error, {trailing_input, Position, Remainder}};
-        Error ->
-            Error
+    try Parser(Input) of
+        {A, _, <<>>}             -> {ok, A};
+        {_, Position, Remainder} -> {error, {trailing_input, Position, Remainder}}
+    catch
+        throw:Error              -> {error, Error}
     end.
 
 % ------------------------------------------------------------------------------
@@ -83,7 +80,7 @@ lift5(F, ParserA, ParserB, ParserC, ParserD, ParserE) ->
 -spec pure(A) -> parser(A).
 pure(Term) ->
     fun(Input) ->
-        {ok, {Term, 0, Input}}
+        {Term, 0, Input}
     end.
 
 % Apply a function parser over a parser.
@@ -99,18 +96,17 @@ app(ParserF, ParserA) ->
 -spec empty() -> parser(A) when A :: term().
 empty() ->
     fun(Input) ->
-        {error, {empty, 0, Input}}
+        throw({empty, 0, Input})
     end.
 
 % Try one parser, and if it fails, try another.
 -spec alt(parser(A :: term()), parser(A)) -> parser(A).
 alt(ParserA, ParserB) ->
     fun(Input) ->
-        case ParserA(Input) of
-            {ok, _} = Result ->
-                Result;
-            _ ->
-                ParserB(Input)
+        try ParserA(Input) of
+            Result  -> Result
+        catch
+            throw:_ -> ParserB(Input)
         end
     end.
 
@@ -118,14 +114,12 @@ alt(ParserA, ParserB) ->
 -spec bind(parser(A), fun((A) -> parser(B))) -> parser(B).
 bind(ParserA, F) ->
     fun(Input1) ->
-        case ParserA(Input1) of
-            {ok, {A, Position1, Input2}} ->
-                {Success, {Result, Position2, Input3}} = (F(A))(Input2),
-                % No matter if success or failure; offset the position by
-                % the result of the first parser
-                {Success, {Result, Position1 + Position2, Input3}};
-            Error ->
-                Error
+        {A, Position1, Input2} = ParserA(Input1),
+        % No matter if success or failure; offset the position by the result of the first parser.
+        try (F(A))(Input2) of
+            {B, Position2, Input3}            -> {B, Position1 + Position2, Input3}
+        catch
+            throw:{Reason, Position2, Input3} -> throw({Reason, Position1 + Position2, Input3})
         end
     end.
 
@@ -237,9 +231,9 @@ uint(Bytes, ErrReason) ->
     Bits = Bytes*8,
     fun
         (<<N:Bits/unsigned, Rest/binary>>) ->
-            {ok, {N, Bytes, Rest}};
+            {N, Bytes, Rest};
         (Rest) ->
-            {error, {ErrReason, 0, Rest}}
+            throw({ErrReason, 0, Rest})
     end.
 
 % Parse a signed, big-endian integer of the specified byte size.
@@ -248,9 +242,9 @@ int(Bytes, ErrReason) ->
     Bits = Bytes*8,
     fun
         (<<N:Bits/signed, Rest/binary>>) ->
-            {ok, {N, Bytes, Rest}};
+            {N, Bytes, Rest};
         (Rest) ->
-            {error, {ErrReason, 0, Rest}}
+            throw({ErrReason, 0, Rest})
     end.
 
 -spec uint8() -> parser(non_neg_integer()).
@@ -282,9 +276,9 @@ int64() -> int(8, int64).
 binary(Bytes) ->
     fun
         (<<Binary:Bytes/binary, Rest/binary>>) ->
-            {ok, {Binary, Bytes, Rest}};
+            {Binary, Bytes, Rest};
         (Rest) ->
-            {error, {binary, 0, Rest}}
+            throw({binary, 0, Rest})
     end.
 
 % -----------------------------------------------------------------------------
